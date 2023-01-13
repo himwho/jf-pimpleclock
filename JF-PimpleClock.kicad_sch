@@ -3952,7 +3952,7 @@
     (property "Value" "16Mhz" (id 1) (at 64.77 44.4499 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Footprint" "Crystal:Crystal_SMD_2012-2Pin_2.0x1.2mm" (id 2) (at 60.96 43.18 0)
+    (property "Footprint" "Crystal:Crystal_SMD_HC49-SD" (id 2) (at 60.96 43.18 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 60.96 43.18 0)
@@ -4357,7 +4357,7 @@
     (property "Value" "Battery_Cell" (id 1) (at 85.09 97.2821 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Battery:BatteryHolder_Keystone_3002_1x2032" (id 2) (at 88.9 98.044 90)
+    (property "Footprint" "Battery:BatteryHolder_Keystone_1060_1x2032" (id 2) (at 88.9 98.044 90)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 88.9 98.044 90)
@@ -4443,7 +4443,7 @@
       (reference "#PWR019") (unit 1) (value "GND") (footprint "")
     )
     (path "/f58a2942-2c03-48af-bf7b-010ef19383bc"
-      (reference "BT1") (unit 1) (value "Battery_Cell") (footprint "Battery:BatteryHolder_Keystone_3002_1x2032")
+      (reference "BT1") (unit 1) (value "Battery_Cell") (footprint "Battery:BatteryHolder_Keystone_1060_1x2032")
     )
     (path "/e35f40bf-e2f4-4983-a837-faf26800d84f"
       (reference "BT2") (unit 1) (value "Li-Po Battery") (footprint "")
@@ -4614,7 +4614,7 @@
       (reference "U5") (unit 1) (value "TPS61200DRC") (footprint "Package_SON:Texas_S-PVSON-N10_ThermalVias")
     )
     (path "/ba7aaaa8-9f4f-4fb9-b3c5-6e0d28dc1372"
-      (reference "Y1") (unit 1) (value "16Mhz") (footprint "Crystal:Crystal_SMD_2012-2Pin_2.0x1.2mm")
+      (reference "Y1") (unit 1) (value "16Mhz") (footprint "Crystal:Crystal_SMD_HC49-SD")
     )
   )
 )
