@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "DFR0299")(type "Legacy")(uri "${KIPRJMOD}/parts/DFR0299/DFR0299.lib")(options "")(descr ""))
+)
