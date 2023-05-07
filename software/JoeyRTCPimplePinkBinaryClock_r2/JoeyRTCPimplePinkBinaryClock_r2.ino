@@ -1,6 +1,7 @@
 #include <ButtonDebounce.h>
 #include <Wire.h>
 #include <Adafruit_NeoPixel.h>
+#include <SoftwareSerial.h>
 
 #define PIN 4
 #define NUMPIXELS 10
@@ -19,14 +20,11 @@ ButtonDebounce buttonH(3, 250);
 ButtonDebounce buttonDim(8, 250);
 ButtonDebounce buttonPlay(9, 250);
 
-#include <DFPlayerMini_Fast.h>
+#include "DFRobotDFPlayerMini.h"
 
-#if !defined(UBRR1H)
-#include <SoftwareSerial.h>
-SoftwareSerial mySerial(0, 1); // RX, TX
-#endif
-
-DFPlayerMini_Fast myMP3;
+SoftwareSerial mySoftwareSerial(5, 6); // RX, TX
+DFRobotDFPlayerMini myDFPlayer;
+void printDetail(uint8_t type, int value);
 
 //  RIGHT HERE IS WHERE YOU CHANGE THE COLOR VALUES. VALUES RANGE FROM 0 (0FF) TO 255 (FULL BRIGHTNESS)
 
@@ -43,6 +41,7 @@ int bValue = 102;
 
 int hourModifier;
 int minuteModifier;
+int dimModifier;
 
 int hours;
 int minutes;
@@ -51,6 +50,8 @@ int rtcMinutes;
 
 bool lastState = false;
 bool lastStateH = false;
+bool lastDimmerState = false;
+bool lastPlayState = false;
 bool wrapAroundHour = false;
 
 void setup()
@@ -58,20 +59,17 @@ void setup()
   Wire.begin();
   Serial.begin(9600);
 
-#if !defined(UBRR1H)
-  mySerial.begin(9600);
-  myMP3.begin(mySerial, true);
-#else
-  Serial1.begin(9600);
-  myMP3.begin(Serial1, true);
-#endif
-  delay(1000);
+  mySoftwareSerial.begin(9600);
   Serial.println("Setting volume to max");
-  myMP3.volume(30);
-  Serial.println("Looping track 1");
-  myMP3.loop(1);
-  myMP3.play(1);
-  
+  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
+    Serial.println(F("Unable to begin:"));
+    Serial.println(F("1.Please recheck the connection!"));
+    Serial.println(F("2.Please insert the SD card!"));
+    while(true);
+  }
+  Serial.println(F("DFPlayer Mini online."));
+  myDFPlayer.volume(30);  //Set volume value. From 0 to 30
+    
   pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
   pixels.clear();
   // clear /EOSC bit
@@ -110,6 +108,9 @@ void loop()
     printTimeDecimal();
     checkButtonsAndUpdateModifiers();
     printTimeAsBinaries(); 
+    if (myDFPlayer.available()) {
+      printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
+    }
   }
 }
 
@@ -171,6 +172,7 @@ void checkButtonsAndUpdateModifiers()
   {
     lastState = false;
   }
+  
   buttonH.update();
   if(buttonH.state() == LOW && lastStateH == false)
   {
@@ -184,6 +186,31 @@ void checkButtonsAndUpdateModifiers()
   if(buttonH.state() == HIGH)
   {
     lastStateH = false;
+  }
+
+  buttonDim.update();
+  if(buttonDim.state() == LOW && lastDimmerState == false)
+  {
+    Serial.print(dimModifier);
+    Serial.println("  Clicked");
+    dimModifier ++;
+    lastDimmerState = true;
+  }
+  if(buttonDim.state() == HIGH)
+  {
+    lastDimmerState = false;
+  }
+
+  buttonPlay.update();
+  if(buttonPlay.state() == LOW && lastPlayState == false)
+  {
+    Serial.println("Play Audio Clicked");
+    myDFPlayer.play(1);
+    lastPlayState = true;
+  }
+  if(buttonPlay.state() == HIGH)
+  {
+    lastPlayState = false;
   }
 }
 
@@ -218,4 +245,59 @@ void printTimeAsBinaries()
 //      Serial.print(BIT(seconds,s));
 //    }
 //    Serial.println();
+}
+
+void printDetail(uint8_t type, int value){
+  switch (type) {
+    case TimeOut:
+      Serial.println(F("Time Out!"));
+      break;
+    case WrongStack:
+      Serial.println(F("Stack Wrong!"));
+      break;
+    case DFPlayerCardInserted:
+      Serial.println(F("Card Inserted!"));
+      break;
+    case DFPlayerCardRemoved:
+      Serial.println(F("Card Removed!"));
+      break;
+    case DFPlayerCardOnline:
+      Serial.println(F("Card Online!"));
+      break;
+    case DFPlayerPlayFinished:
+      Serial.print(F("Number:"));
+      Serial.print(value);
+      Serial.println(F(" Play Finished!"));
+      break;
+    case DFPlayerError:
+      Serial.print(F("DFPlayerError:"));
+      switch (value) {
+        case Busy:
+          Serial.println(F("Card not found"));
+          break;
+        case Sleeping:
+          Serial.println(F("Sleeping"));
+          break;
+        case SerialWrongStack:
+          Serial.println(F("Get Wrong Stack"));
+          break;
+        case CheckSumNotMatch:
+          Serial.println(F("Check Sum Not Match"));
+          break;
+        case FileIndexOut:
+          Serial.println(F("File Index Out of Bound"));
+          break;
+        case FileMismatch:
+          Serial.println(F("Cannot Find File"));
+          break;
+        case Advertise:
+          Serial.println(F("In Advertise"));
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
 }
