@@ -20,11 +20,65 @@ ButtonDebounce buttonH(2, 250); // 2 = 2nd from top button
 ButtonDebounce buttonDim(8, 250); // 8 = bottom button
 ButtonDebounce buttonPlay(9, 250); // 9 = 3rd from top button
 
-#include "DFRobotDFPlayerMini.h"
+#include <DFMiniMp3.h>
+class Mp3Notify; 
+SoftwareSerial secondarySerial(5, 6); // RX, TX
+typedef DFMiniMp3<SoftwareSerial, Mp3Notify> DfMp3;
+DfMp3 dfmp3(secondarySerial);
 
-SoftwareSerial mySoftwareSerial(5, 6); // RX, TX
-DFRobotDFPlayerMini myDFPlayer;
-void printDetail(uint8_t type, int value);
+class Mp3Notify
+{
+public:
+  static void PrintlnSourceAction(DfMp3_PlaySources source, const char* action)
+  {
+    if (source & DfMp3_PlaySources_Sd) 
+    {
+        Serial.print("SD Card, ");
+    }
+    if (source & DfMp3_PlaySources_Usb) 
+    {
+        Serial.print("USB Disk, ");
+    }
+    if (source & DfMp3_PlaySources_Flash) 
+    {
+        Serial.print("Flash, ");
+    }
+    Serial.println(action);
+  }
+  static void OnError([[maybe_unused]] DfMp3& mp3, uint16_t errorCode)
+  {
+    // see DfMp3_Error for code meaning
+    Serial.println();
+    Serial.print("Com Error ");
+    Serial.println(errorCode);
+  }
+  static void OnPlayFinished([[maybe_unused]] DfMp3& mp3, [[maybe_unused]] DfMp3_PlaySources source, uint16_t track)
+  {
+    Serial.print("Play finished for #");
+    Serial.println(track);  
+
+    // start next track
+    track += 1;
+    // this example will just start back over with 1 after track 3
+    if (track > 3) 
+    {
+      track = 1;
+    }
+    dfmp3.playMp3FolderTrack(track);  // sd:/mp3/0001.mp3, sd:/mp3/0002.mp3, sd:/mp3/0003.mp3
+  }
+  static void OnPlaySourceOnline([[maybe_unused]] DfMp3& mp3, DfMp3_PlaySources source)
+  {
+    PrintlnSourceAction(source, "online");
+  }
+  static void OnPlaySourceInserted([[maybe_unused]] DfMp3& mp3, DfMp3_PlaySources source)
+  {
+    PrintlnSourceAction(source, "inserted");
+  }
+  static void OnPlaySourceRemoved([[maybe_unused]] DfMp3& mp3, DfMp3_PlaySources source)
+  {
+    PrintlnSourceAction(source, "removed");
+  }
+};
 
 //  RIGHT HERE IS WHERE YOU CHANGE THE COLOR VALUES. VALUES RANGE FROM 0 (0FF) TO 255 (FULL BRIGHTNESS)
 
@@ -59,16 +113,23 @@ void setup()
   Wire.begin();
   Serial.begin(9600);
 
-  mySoftwareSerial.begin(9600);
-  Serial.println("Setting volume to max");
-  if (!myDFPlayer.begin(mySoftwareSerial)) {  //Use softwareSerial to communicate with mp3.
-    Serial.println(F("Unable to begin:"));
-    Serial.println(F("1.Please recheck the connection!"));
-    Serial.println(F("2.Please insert the SD card!"));
-    while(true);
-  }
-  Serial.println(F("DFPlayer Mini online."));
-  myDFPlayer.volume(30);  //Set volume value. From 0 to 30
+  secondarySerial.begin(9600);
+  dfmp3.begin();
+  // for boards that support hardware arbitrary pins
+  //dfmp3.begin(5, 6); // RX, TX
+
+  uint16_t version = dfmp3.getSoftwareVersion();
+  Serial.print("version ");
+  Serial.println(version);
+  uint16_t volume = dfmp3.getVolume();
+  Serial.print("volume ");
+  Serial.println(volume);
+  dfmp3.setVolume(30); // 0 - 30
+  dfmp3.setRepeatPlayAllInRoot(false); // prevents looping
+  uint16_t count = dfmp3.getTotalTrackCount(DfMp3_PlaySource_Sd);
+  Serial.print("files ");
+  Serial.println(count);
+  Serial.println("starting...");
     
   pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
   pixels.clear();
@@ -107,9 +168,10 @@ void loop()
     getModulosAndCorrectZeroHour();
     printTimeDecimal();
     checkButtonsAndUpdateModifiers();
-    printTimeAsBinaries(); 
-    if (myDFPlayer.available()) {
-      printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
+    printTimeAsBinaries();
+    if (minutes == 0 && seconds == 0) {
+      dfmp3.playGlobalTrack(1); // play sound at top of each hour
+      dfmp3.setRepeatPlayCurrentTrack(false);
     }
   }
 }
@@ -205,7 +267,8 @@ void checkButtonsAndUpdateModifiers()
   if(buttonPlay.state() == LOW && lastPlayState == false)
   {
     Serial.println("Play Audio Clicked");
-    myDFPlayer.play(1);
+    dfmp3.playGlobalTrack(1);
+    dfmp3.setRepeatPlayCurrentTrack(false);
     lastPlayState = true;
   }
   if(buttonPlay.state() == HIGH)
@@ -216,7 +279,9 @@ void checkButtonsAndUpdateModifiers()
 
 void printTimeAsBinaries()
 {
-     for(int h = 3; h >= 0; h--)
+    // TODO: hours and minutes are swapped in circuit, temp changed in code for testing
+    // should fix for production
+    for(int h = 3; h >= 0; h--)
     {
       if(BIT(hours, h) == 1)
       {
@@ -245,59 +310,4 @@ void printTimeAsBinaries()
 //      Serial.print(BIT(seconds,s));
 //    }
 //    Serial.println();
-}
-
-void printDetail(uint8_t type, int value){
-  switch (type) {
-    case TimeOut:
-      Serial.println(F("Time Out!"));
-      break;
-    case WrongStack:
-      Serial.println(F("Stack Wrong!"));
-      break;
-    case DFPlayerCardInserted:
-      Serial.println(F("Card Inserted!"));
-      break;
-    case DFPlayerCardRemoved:
-      Serial.println(F("Card Removed!"));
-      break;
-    case DFPlayerCardOnline:
-      Serial.println(F("Card Online!"));
-      break;
-    case DFPlayerPlayFinished:
-      Serial.print(F("Number:"));
-      Serial.print(value);
-      Serial.println(F(" Play Finished!"));
-      break;
-    case DFPlayerError:
-      Serial.print(F("DFPlayerError:"));
-      switch (value) {
-        case Busy:
-          Serial.println(F("Card not found"));
-          break;
-        case Sleeping:
-          Serial.println(F("Sleeping"));
-          break;
-        case SerialWrongStack:
-          Serial.println(F("Get Wrong Stack"));
-          break;
-        case CheckSumNotMatch:
-          Serial.println(F("Check Sum Not Match"));
-          break;
-        case FileIndexOut:
-          Serial.println(F("File Index Out of Bound"));
-          break;
-        case FileMismatch:
-          Serial.println(F("Cannot Find File"));
-          break;
-        case Advertise:
-          Serial.println(F("In Advertise"));
-          break;
-        default:
-          break;
-      }
-      break;
-    default:
-      break;
-  }
 }
