@@ -252,7 +252,9 @@ void checkButtonsAndUpdateModifiers()
   {
     Serial.print(dimModifier);
     Serial.println("  Clicked");
+    pixels.setBrightness(dimModifier * 85);
     dimModifier ++;
+    dimModifier % 3; // only 3 dim settings
     lastDimmerState = true;
   }
   if(buttonDim.state() == HIGH)
@@ -280,7 +282,7 @@ void printTimeAsBinaries()
     {
       if(BIT(hours, h) == 1)
       {
-        pixels.setPixelColor(h, pixels.Color(gValue, rValue, bValue));
+        pixels.setPixelColor(h, rValue, gValue, bValue);
       } else {
         pixels.setPixelColor(h, pixels.Color(0, 0, 0));
       }
@@ -288,7 +290,7 @@ void printTimeAsBinaries()
     for(int m = 4; m < 10; m++)
     {
       if(BIT(minutes, m-4) == 1){
-        pixels.setPixelColor(m, pixels.Color(gValue, rValue, bValue));
+        pixels.setPixelColor(m, rValue, gValue, bValue);
       } else {
         pixels.setPixelColor(m, pixels.Color(0, 0, 0));
       }
