@@ -112,12 +112,9 @@ void setup()
 {
   Wire.begin();
   Serial.begin(9600);
-
   secondarySerial.begin(9600);
+  
   dfmp3.begin();
-  // for boards that support hardware arbitrary pins
-  //dfmp3.begin(5, 6); // RX, TX
-
   uint16_t version = dfmp3.getSoftwareVersion();
   Serial.print("version ");
   Serial.println(version);
@@ -279,32 +276,23 @@ void checkButtonsAndUpdateModifiers()
 
 void printTimeAsBinaries()
 {
-    // TODO: hours and minutes are swapped in circuit, temp changed in code for testing
-    // should fix for production
-    for(int h = 3; h >= 0; h--)
+    for(int h = 0; h < 4; h++)
     {
       if(BIT(hours, h) == 1)
       {
-        pixels.setPixelColor(9 - h , pixels.Color(gValue, rValue, bValue));
+        pixels.setPixelColor(h, pixels.Color(gValue, rValue, bValue));
+      } else {
+        pixels.setPixelColor(h, pixels.Color(0, 0, 0));
       }
-      else
-      {
-        pixels.setPixelColor(9 - h, pixels.Color(0, 0, 0));
-      }
-      //Serial.print(BIT(hours,h));
     }
-    //Serial.println();
-    for(int m = 5; m >= 0; m--)
+    for(int m = 4; m < 10; m++)
     {
-      if(BIT(minutes, m) == 1){
-      pixels.setPixelColor(m, pixels.Color(gValue, rValue, bValue));
-      }
-      else{
+      if(BIT(minutes, m-4) == 1){
+        pixels.setPixelColor(m, pixels.Color(gValue, rValue, bValue));
+      } else {
         pixels.setPixelColor(m, pixels.Color(0, 0, 0));
       }
-      //Serial.print(BIT(minutes,m));
     }
-    //Serial.println();
 //    for(int s = 5; s >= 0; s--)
 //    {
 //      Serial.print(BIT(seconds,s));
