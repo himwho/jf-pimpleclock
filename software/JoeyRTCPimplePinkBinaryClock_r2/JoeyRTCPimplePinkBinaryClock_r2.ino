@@ -15,10 +15,10 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 // hr set = 3
 // dimmer set = 8
 // audio play = 9
-ButtonDebounce buttonM(2, 250);
-ButtonDebounce buttonH(3, 250);
-ButtonDebounce buttonDim(8, 250);
-ButtonDebounce buttonPlay(9, 250);
+ButtonDebounce buttonM(3, 250); // 3 = top button
+ButtonDebounce buttonH(2, 250); // 2 = 2nd from top button
+ButtonDebounce buttonDim(8, 250); // 8 = bottom button
+ButtonDebounce buttonPlay(9, 250); // 9 = 3rd from top button
 
 #include "DFRobotDFPlayerMini.h"
 
@@ -134,7 +134,7 @@ void addModifiers()
 
 void getModulosAndCorrectZeroHour()
 {
-    if (hours > 12)
+    if (hours > 11)
     {
       hours = hours%12;
     }
