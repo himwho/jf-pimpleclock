@@ -89,9 +89,9 @@ public:
 
 //These are Pimple Pink
 //105, 55, 25
-int rValue = 255;        
-int gValue = 102;
-int bValue = 102;
+int rValue = 0;        
+int gValue = 255;
+int bValue = 25;
 
 int hourModifier;
 int minuteModifier;

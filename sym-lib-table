@@ -1,3 +1,5 @@
 (sym_lib_table
+  (version 7)
   (lib (name "DFR0299")(type "Legacy")(uri "${KIPRJMOD}/parts/DFR0299/DFR0299.lib")(options "")(descr ""))
+  (lib (name "3362P")(type "KiCad")(uri "${KIPRJMOD}/parts/3362P-1-103LF.kicad_sym")(options "")(descr ""))
 )
