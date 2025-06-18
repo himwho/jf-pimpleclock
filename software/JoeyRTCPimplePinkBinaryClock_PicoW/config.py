@@ -5,8 +5,8 @@ WIFI_SSID = "sistersweetheart"
 WIFI_PASSWORD = "sabrinacunningham"
 
 # Hardware Configuration
-NEOPIXEL_PIN = 16
-NUM_PIXELS = 25  # 5x5 grid
+NEOPIXEL_PIN = 2
+NUM_PIXELS = 10  # 5x5 grid
 
 # Time Settings
 TIMEZONE_OFFSET = -8  # Hours from UTC (PST = -8, EST = -5, GMT = 0)

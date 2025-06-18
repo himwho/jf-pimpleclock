@@ -21,8 +21,8 @@ except ImportError:
     # Fallback configuration if config.py is missing
     WIFI_SSID = "sistersweetheart"
     WIFI_PASSWORD = "sabrinacunningham"
-    NEOPIXEL_PIN = 16
-    NUM_PIXELS = 25
+    NEOPIXEL_PIN = 2
+    NUM_PIXELS = 10
     TIMEZONE_OFFSET = -8
     NTP_SERVER = "pool.ntp.org"
     DEFAULT_BRIGHTNESS = 50
