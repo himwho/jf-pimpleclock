@@ -9,9 +9,8 @@ import time
 import machine
 import neopixel
 import ntptime
-import json
-from machine import Pin, RTC, Timer
-import uasyncio as asyncio
+from machine import Pin, RTC
+import _thread
 import gc
 
 # Import configuration
@@ -57,42 +56,38 @@ class BinaryClock:
             np[i] = COLORS['off']
         np.write()
         
-    def set_pixel(self, x, y, color):
-        """Set pixel at grid position (x, y)"""
-        if 0 <= x < 5 and 0 <= y < 5:
-            index = y * 5 + x
-            np[index] = color
-            
     def display_binary_time(self, hours, minutes, seconds):
-        """Display time in binary format on 5x5 grid"""
+        """Display time in binary format - Arduino style"""
         self.clear_display()
         
-        # Hours (0-23) - top 2 rows
-        self.display_binary_number(hours, 0, 2)
-        
-        # Minutes (0-59) - middle 2 rows  
-        self.display_binary_number(minutes, 2, 2)
-        
-        # Seconds (0-59) - bottom row (just show if even/odd)
-        if seconds % 2 == 0:
-            self.set_pixel(2, 4, COLORS['accent'])
+        # Convert to 12-hour format like Arduino
+        display_hours = hours
+        if display_hours > 12:
+            display_hours = display_hours % 12
+        if display_hours == 0:
+            display_hours = 12
             
+        # Hours (0-11) - first 4 pixels (pixels 0-3)
+        for h in range(4):
+            if (display_hours >> h) & 1:  # Check bit h
+                color = COLORS['on']
+                if brightness < 100:
+                    color = tuple(int(c * brightness / 100) for c in color)
+                np[h] = color
+            else:
+                np[h] = COLORS['off']
+        
+        # Minutes (0-59) - next 6 pixels (pixels 4-9)
+        for m in range(6):
+            if (minutes >> m) & 1:  # Check bit m
+                color = COLORS['on']
+                if brightness < 100:
+                    color = tuple(int(c * brightness / 100) for c in color)
+                np[m + 4] = color
+            else:
+                np[m + 4] = COLORS['off']
+                
         np.write()
-        
-    def display_binary_number(self, number, start_row, num_rows):
-        """Display a number in binary across specified rows"""
-        binary_str = '{:010b}'.format(number)  # 10-bit binary
-        
-        bit_index = 0
-        for row in range(start_row, start_row + num_rows):
-            for col in range(5):
-                if bit_index < len(binary_str):
-                    if binary_str[-(bit_index + 1)] == '1':  # Reverse order
-                        color = COLORS['on']
-                        if brightness < 100:
-                            color = tuple(int(c * brightness / 100) for c in color)
-                        self.set_pixel(col, row, color)
-                    bit_index += 1
                     
     def display_rainbow(self):
         """Display a rainbow pattern"""
@@ -346,117 +341,116 @@ def webpage(ip_address):
     """
     return html
 
-async def handle_client(reader, writer):
-    """Handle incoming web requests"""
+def handle_request(client_socket):
+    """Handle incoming HTTP requests - based on working test_web.py"""
     global display_mode, brightness
     
     try:
-        # Read the request
-        request_line = await reader.readline()
-        request = request_line.decode().strip()
-        print(f"Request: {request}")
+        request = client_socket.recv(1024).decode()
+        print(f"Request: {request.split()[0:2] if request else 'Empty'}")
         
-        # Skip headers
-        while True:
-            line = await reader.readline()
-            if line == b'\r\n':
-                break
-                
-        # Parse the request
-        if request.startswith('GET'):
-            path = request.split()[1]
+        if 'GET /' in request and not any(x in request for x in ['/mode/', '/brightness/', '/sync', '/clear']):
+            # Main page
+            wlan = network.WLAN(network.STA_IF)
+            ip = wlan.ifconfig()[0] if wlan.isconnected() else "Unknown"
+            response_body = webpage(ip)
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n{response_body}"
             
-            # Handle different endpoints
-            if path == '/':
-                # Main page
-                ip = connect_wifi()
-                response_body = webpage(ip or "Unknown")
-                
-            elif path == '/status':
-                # Status API
-                current_time = get_current_time()
-                status = {
-                    'time': f"{current_time[0]:02d}:{current_time[1]:02d}:{current_time[2]:02d}",
-                    'uptime': time.ticks_ms() // 1000,
-                    'mode': display_mode,
-                    'brightness': brightness,
-                    'wifi': wifi_connected
-                }
-                response_body = json.dumps(status)
-                
-            elif path.startswith('/mode/'):
-                # Change display mode
-                new_mode = path.split('/')[-1]
-                if new_mode in ['binary', 'rainbow']:
-                    display_mode = new_mode
-                response_body = f"Mode changed to {display_mode}"
-                
-            elif path.startswith('/brightness/'):
-                # Change brightness
+        elif 'GET /mode/' in request:
+            # Change display mode
+            if '/mode/binary' in request:
+                display_mode = 'binary'
+            elif '/mode/rainbow' in request:
+                display_mode = 'rainbow'
+            response_body = f"Mode changed to {display_mode}"
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{response_body}"
+            
+        elif 'GET /brightness/' in request:
+            # Change brightness
+            if '/brightness/up' in request:
+                brightness = min(100, brightness + 10)
+            elif '/brightness/down' in request:
+                brightness = max(10, brightness - 10)
+            else:
+                # Try to parse specific brightness value
                 try:
-                    if path.endswith('/up'):
-                        brightness = min(100, brightness + 10)
-                    elif path.endswith('/down'):
-                        brightness = max(10, brightness - 10)
-                    else:
-                        brightness = max(10, min(100, int(path.split('/')[-1])))
+                    parts = request.split('/')
+                    for i, part in enumerate(parts):
+                        if part == 'brightness' and i + 1 < len(parts):
+                            brightness = max(10, min(100, int(parts[i + 1].split()[0])))
+                            break
                 except:
                     pass
-                response_body = f"Brightness set to {brightness}%"
-                
-            elif path == '/sync':
-                # Sync time
-                if sync_time():
-                    response_body = "Time synchronized"
-                else:
-                    response_body = "Time sync failed"
-                    
-            elif path == '/clear':
-                # Clear display
-                clock.clear_display()
-                response_body = "Display cleared"
-                
-            else:
-                response_body = "Not found"
-                
-            # Send response
-            if path == '/status':
-                headers = 'HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n'
-            else:
-                headers = 'HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n'
-                
-            writer.write(headers.encode())
-            writer.write(response_body.encode())
-            await writer.drain()
+            response_body = f"Brightness set to {brightness}%"
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{response_body}"
             
+        elif 'GET /sync' in request:
+            # Sync time
+            if sync_time():
+                response_body = "Time synchronized"
+            else:
+                response_body = "Time sync failed"
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{response_body}"
+            
+        elif 'GET /clear' in request:
+            # Clear display
+            clock.clear_display()
+            response_body = "Display cleared"
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{response_body}"
+            
+        else:
+            # 404 Not Found
+            response_body = "Not Found"
+            response = f"HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n{response_body}"
+            
+        client_socket.send(response.encode())
+        
     except Exception as e:
         print(f"Request handling error: {e}")
         
     finally:
-        try:
-            writer.close()
-            await writer.wait_closed()
-        except:
-            pass
+        client_socket.close()
 
-async def web_server():
-    """Run the web server"""
+def web_server():
+    """Run the web server - based on working test_web.py"""
     global web_server_running
     
     try:
-        print("Starting web server on port 80...")
-        server = await asyncio.start_server(handle_client, "0.0.0.0", 80)
-        web_server_running = True
-        print("Web server running!")
+        # Create socket
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(('0.0.0.0', 80))
+        server_socket.listen(1)
         
-        async with server:
-            await server.serve_forever()
-            
+        wlan = network.WLAN(network.STA_IF)
+        ip = wlan.ifconfig()[0] if wlan.isconnected() else "Unknown"
+        print(f"🌐 Web server running on http://{ip}")
+        web_server_running = True
+        
+        while True:
+            try:
+                client_socket, addr = server_socket.accept()
+                print(f"📡 Connection from {addr}")
+                handle_request(client_socket)
+                
+            except KeyboardInterrupt:
+                print("\n⏹️  Stopping web server...")
+                break
+                
+            except Exception as e:
+                print(f"Connection error: {e}")
+                
     except Exception as e:
-        print(f"Web server error: {e}")
+        print(f"Server error: {e}")
         web_server_running = False
+        
+    finally:
+        try:
+            server_socket.close()
+        except:
+            pass
 
-async def clock_update():
+def clock_update():
     """Update the clock display"""
     while True:
         try:
@@ -474,9 +468,9 @@ async def clock_update():
         except Exception as e:
             print(f"Clock update error: {e}")
             
-        await asyncio.sleep(1)
+        time.sleep(1)
 
-async def main():
+def main():
     """Main application loop"""
     print("🕐 Pimple Pink Binary Clock Starting...")
     
@@ -489,20 +483,26 @@ async def main():
         # Sync time
         sync_time()
         
-        # Start both tasks
         print("Starting clock and web server...")
-        await asyncio.gather(
-            clock_update(),
-            web_server()
-        )
+        
+        # Start web server in separate thread
+        try:
+            _thread.start_new_thread(web_server, ())
+            print("Web server thread started")
+        except Exception as e:
+            print(f"Failed to start web server thread: {e}")
+        
+        # Run clock update in main thread
+        clock_update()
+        
     else:
         print("WiFi connection failed, running in offline mode")
         # Just run the clock
-        await clock_update()
+        clock_update()
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         print("Shutting down...")
         clock.clear_display()

@@ -6,7 +6,7 @@ import serial
 import time
 import sys
 
-def clear_main_py(port='/dev/tty.usbmodem101', baud=115200):
+def clear_main_py(port='/dev/tty.usbmodem1201', baud=115200):
     """Try to interrupt running program and remove main.py"""
     try:
         print("🔧 Connecting to Pico W...")
